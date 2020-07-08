@@ -1,0 +1,1755 @@
+
+#!/bin/bash
+# Part of raspi-config https://github.com/RPi-Distro/raspi-config
+#
+# See LICENSE file for copyright and license details
+
+INTERACTIVE=True
+ASK_TO_REBOOT=0
+CONFIG=/boot/uEnv.txt
+line=`sed -n '/#overlay_start/=' $CONFIG | tail -n1`
+line=`expr $line + 1`
+#lcd_timing_array=("NULL" "clock-frequency" "hactive" "vactive" "hfront-porch" \
+#                "hback-porch" "hsync-len" "vback-porch" "vfront-porch" \
+#                  "vsync-len" "bits-per-pixel")
+is_pi () {
+  ARCH=$(dpkg --print-architecture)
+  if [ "$ARCH" = "armhf" ] ; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+deb_ver () {
+  ver=`cat /etc/debian_version | cut -d . -f 1`
+  echo $ver
+}
+
+calc_wt_size() {
+  # NOTE: it's tempting to redirect stderr to /dev/null, so supress error 
+  # output from tput. However in this case, tput detects neither stdout or 
+  # stderr is a tty and so only gives default 80, 24 values
+  WT_HEIGHT=17
+  WT_WIDTH=$(tput cols)
+
+  if [ -z "$WT_WIDTH" ] || [ "$WT_WIDTH" -lt 60 ]; then
+    WT_WIDTH=80
+  fi
+  if [ "$WT_WIDTH" -gt 178 ]; then
+    WT_WIDTH=120
+  fi
+  WT_MENU_HEIGHT=$(($WT_HEIGHT-7))
+}
+
+do_about() {
+  whiptail --msgbox "\
+This tool provides a straight-forward way of doing initial
+configuration of the Raspberry Pi. Although it can be run
+at any time, some of the options may have difficulties if
+you have heavily customised your installation.\
+" 20 70 1
+}
+
+get_iic1() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_iic1() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_iic1) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the IIC_1 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-i2c1-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The IIC_1 interface is $STATUS" 20 60 1
+  fi
+}	   
+
+get_iic2() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_iic2() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_iic2) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the IIC_2 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-i2c2-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The IIC_2 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_74hc595() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_74hc595() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_74hc595) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the 74hc595 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-74hc595-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The 74hc595 interface is $STATUS" 20 60 1
+  fi
+}
+
+
+do_expand_rootfs() {
+  ROOT_PART=$(mount | sed -n 's|^/dev/\(.*\) on / .*|\1|p')
+
+  PART_NUM=${ROOT_PART#mmcblk0p}
+  if [ "$PART_NUM" = "$ROOT_PART" ]; then
+    whiptail --msgbox "$ROOT_PART is not an SD card. Don't know how to expand" 20 60 2
+    return 0
+  fi
+
+  # NOTE: the NOOBS partition layout confuses parted. For now, let's only 
+  # agree to work with a sufficiently simple partition layout
+  if [ "$PART_NUM" -ne 2 ]; then
+    whiptail --msgbox "Your partition layout is not currently supported by this tool. You are probably using NOOBS, in which case your root filesystem is already expanded anyway." 20 60 2
+    return 0
+  fi
+
+  LAST_PART_NUM=$(parted /dev/mmcblk0 -ms unit s p | tail -n 1 | cut -f 1 -d:)
+  if [ $LAST_PART_NUM -ne $PART_NUM ]; then
+    whiptail --msgbox "$ROOT_PART is not the last partition. Don't know how to expand" 20 60 2
+    return 0
+  fi
+
+  # Get the starting offset of the root partition
+  PART_START=$(parted /dev/mmcblk0 -ms unit s p | grep "^${PART_NUM}" | cut -f 2 -d: | sed 's/[^0-9]//g')
+  [ "$PART_START" ] || return 1
+  # Return value will likely be error for fdisk as it fails to reload the
+  # partition table because the root fs is mounted
+  fdisk /dev/mmcblk0 <<EOF
+p
+d
+$PART_NUM
+n
+p
+$PART_NUM
+$PART_START
+
+p
+w
+EOF
+  ASK_TO_REBOOT=1
+
+  # now set up an init.d script
+cat <<EOF > /etc/init.d/resize2fs_once &&
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          resize2fs_once
+# Required-Start:
+# Required-Stop:
+# Default-Start: 3
+# Default-Stop:
+# Short-Description: Resize the root filesystem to fill partition
+# Description:
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+case "\$1" in
+  start)
+    log_daemon_msg "Starting resize2fs_once" &&
+    resize2fs /dev/$ROOT_PART &&
+    update-rc.d resize2fs_once remove &&
+    rm /etc/init.d/resize2fs_once &&
+    log_end_msg \$?
+    ;;
+  *)
+    echo "Usage: \$0 start" >&2
+    exit 3
+    ;;
+esac
+EOF
+  chmod +x /etc/init.d/resize2fs_once &&
+  update-rc.d resize2fs_once defaults &&
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "Root partition has been resized.\nThe filesystem will be enlarged upon the next reboot" 20 60 2
+  fi
+}
+
+set_config_var() {
+  lua - "$1" "$2" "$3" <<EOF > "$3.bak"
+local key=assert(arg[1])
+local value=assert(arg[2])
+local fn=assert(arg[3])
+local file=assert(io.open(fn))
+local made_change=false
+for line in file:lines() do
+  if line:match("^#?%s*"..key.."=.*$") then
+    line=key.."="..value
+    made_change=true
+  end
+  print(line)
+end
+set_config_var dtparam=i2c_arm $SETTING $CONFIG
+if not made_change then
+  print(key.."="..value)
+end
+EOF
+mv "$3.bak" "$3"
+}
+
+clear_config_var() {
+  lua - "$1" "$2" <<EOF > "$2.bak"
+local key=assert(arg[1])
+local fn=assert(arg[2])
+local file=assert(io.open(fn))
+for line in file:lines() do
+  if line:match("^%s*"..key.."=.*$") then
+    line="#"..line
+  end
+  print(line)
+end
+EOF
+mv "$2.bak" "$2"
+}
+
+get_config_var() {
+  lua - "$1" "$2" <<EOF
+local key=assert(arg[1])
+local fn=assert(arg[2])
+local file=assert(io.open(fn))
+local found=false
+for line in file:lines() do
+  local val = line:match("^%s*"..key.."=(.*)$")
+  if (val ~= nil) then
+    print(val)
+    found=true
+    break
+  end
+end
+if not found then
+   print(0)
+end
+EOF
+}
+
+
+is_number() {
+  case $1 in
+    ''|*[!0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+do_change_pass() {
+  whiptail --msgbox "You will now be asked to enter a new password for the $SUDO_USER user" 20 60 1
+  passwd $SUDO_USER &&
+  whiptail --msgbox "Password changed successfully" 20 60 1
+}
+
+do_change_timezone() {
+  if [ "$INTERACTIVE" = True ]; then
+    dpkg-reconfigure tzdata
+  else
+    local TIMEZONE="$1"
+    if [ ! -f "/usr/share/zoneinfo/$TIMEZONE" ]; then
+      return 1;
+    fi
+    rm /etc/localtime
+    echo "$TIMEZONE" > /etc/timezone
+    dpkg-reconfigure -f noninteractive tzdata
+  fi
+}
+
+get_hostname() {
+    cat /etc/hostname | tr -d " \t\n\r"
+}
+
+do_hostname() {
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "\
+Please note: RFCs mandate that a hostname's labels \
+may contain only the ASCII letters 'a' through 'z' (case-insensitive), 
+the digits '0' through '9', and the hyphen.
+Hostname labels cannot begin or end with a hyphen. 
+No other symbols, punctuation characters, or blank spaces are permitted.\
+" 20 70 1
+  fi
+  CURRENT_HOSTNAME=`cat /etc/hostname | tr -d " \t\n\r"`
+  if [ "$INTERACTIVE" = True ]; then
+    NEW_HOSTNAME=$(whiptail --inputbox "Please enter a hostname" 20 60 "$CURRENT_HOSTNAME" 3>&1 1>&2 2>&3)
+  else
+    NEW_HOSTNAME=$1
+    true
+  fi
+  if [ $? -eq 0 ]; then
+    echo $NEW_HOSTNAME > /etc/hostname
+    sed -i "s/127.0.1.1.*$CURRENT_HOSTNAME/127.0.1.1\t$NEW_HOSTNAME/g" /etc/hosts
+    ASK_TO_REBOOT=1
+  fi
+}
+
+et_overclock() {
+  set_config_var arm_freq $2 $CONFIG &&
+  set_config_var core_freq $3 $CONFIG &&
+  set_config_var sdram_freq $4 $CONFIG &&
+  set_config_var over_voltage $5 $CONFIG &&
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "Set overclock to preset '$1'" 20 60 2
+  fi
+}
+
+clear_overclock () {
+  clear_config_var arm_freq $CONFIG &&
+  clear_config_var core_freq $CONFIG &&
+  clear_config_var sdram_freq $CONFIG &&
+  clear_config_var over_voltage $CONFIG &&
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "Set overclock to preset 'None'" 20 60 2
+  fi
+}
+
+get_spi() {
+  if grep -q -E "^(device_tree_param|dtparam)=([^,]*,)*spi(=(on|true|yes|1))?(,.*)?$" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_spi() {
+  DEFAULT=--defaultno
+  if [ $(get_spi) -eq 0 ]; then
+    DEFAULT=
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the SPI interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq 0 ]; then
+    SETTING=on
+    STATUS=enabled
+  elif [ $RET -eq 1 ]; then
+    SETTING=off
+    STATUS=disabled
+  else
+    return $RET
+  fi
+
+  set_config_var dtparam=spi $SETTING $CONFIG &&
+  if ! [ -e $BLACKLIST ]; then
+    touch $BLACKLIST
+  fi
+  sed $BLACKLIST -i -e "s/^\(blacklist[[:space:]]*spi[-_]bcm2708\)/#\1/"
+  dtparam spi=$SETTING
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The SPI interface is $STATUS" 20 60 1
+  fi
+}
+
+get_led() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_led() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_led) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the led interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo" $CONFIG; then
+      sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+    dtoverlay /lib/firmware/imx-fire-led-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-led-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The led interface is $STATUS" 20 60 1
+  fi
+}
+
+get_key() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_key() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_key) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the key interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo" $CONFIG; then
+      sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+    dtoverlay /lib/firmware/imx-fire-key-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-key-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The key interface is $STATUS" 20 60 1
+  fi
+}
+
+get_iic1() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_iic1() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_iic1) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the IIC 1 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+      sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+    dtoverlay /lib/firmware/imx-fire-i2c1-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The IIC 1 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_sound() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_sound() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_sound) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the iic_2 interface isn't enable" 20 60
+    return 1
+  fi
+    
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the sound interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo" $CONFIG; then
+      sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+    dtoverlay /lib/firmware/imx-fire-sound-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-sound-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The sound interface is $STATUS" 20 60 1
+  fi
+}
+
+get_lcd5() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_lcd5() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_lcd5) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the iic_1 interface isn't enable" 20 60
+    return 1
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the lcd5 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+    dtoverlay /lib/firmware/imx-fire-lcd5-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-lcd5-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The lcd5 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_i2c() {
+  if grep -q -E "^(device_tree_param|dtparam)=([^,]*,)*i2c(_arm)?(=(on|true|yes|1))?(,.*)?$" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_i2c() {
+  DEFAULT=--defaultno
+  if [ $(get_i2c) -eq 0 ]; then
+    DEFAULT=
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the ARM I2C interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq 0 ]; then
+    SETTING=on
+    STATUS=enabled
+  elif [ $RET -eq 1 ]; then
+    SETTING=off
+    STATUS=disabled
+  else
+    return $RET
+  fi
+
+  set_config_var dtparam=i2c_arm $SETTING $CONFIG &&
+  if ! [ -e $BLACKLIST ]; then
+    touch $BLACKLIST
+  fi
+  sed $BLACKLIST -i -e "s/^\(blacklist[[:space:]]*i2c[-_]bcm2708\)/#\1/"
+  sed /etc/modules -i -e "s/^#[[:space:]]*\(i2c[-_]dev\)/\1/"
+  if ! grep -q "^i2c[-_]dev" /etc/modules; then
+    printf "i2c-dev\n" >> /etc/modules
+  fi
+  dtparam i2c_arm=$SETTING
+  modprobe i2c-dev
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The ARM I2C interface is $STATUS" 20 60 1
+  fi
+}
+
+do_can() {
+	echo do_can
+}
+
+disable_raspi_config_at_boot() {
+  if [ -e /etc/profile.d/raspi-config.sh ]; then
+    rm -f /etc/profile.d/raspi-config.sh
+    if [ -e /etc/systemd/system/getty@tty1.service.d/raspi-config-override.conf ]; then
+      rm /etc/systemd/system/getty@tty1.service.d/raspi-config-override.conf
+    fi
+    telinit q
+  fi
+}
+
+get_boot_cli() {
+  if systemctl get-default | grep -q multi-user ; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_finish() {
+  disable_raspi_config_at_boot
+  if [ $ASK_TO_REBOOT -eq 1 ]; then
+    whiptail --yesno "Would you like to reboot now?" 20 60 2
+    if [ $? -eq 0 ]; then # yes
+      sync
+      reboot
+    fi
+  fi
+  exit 0
+}
+
+get_autologin() {
+  if [ $(get_boot_cli) -eq 0 ]; then
+    # booting to CLI
+    # stretch or buster - is there an autologin conf file?
+    if [ -e /etc/systemd/system/getty@tty1.service.d/autologin.conf ] ; then
+      echo 0
+    else
+      # stretch or earlier - check the getty service symlink for autologin
+      if [ $(deb_ver) -le 9 ] && grep -q autologin /etc/systemd/system/getty.target.wants/getty@tty1.service ; then
+        echo 0
+      else
+        echo 1
+      fi
+    fi
+  else
+    # booting to desktop - check the autologin for lightdm
+    if grep -q "^autologin-user=" /etc/lightdm/lightdm.conf ; then
+      echo 0
+    else
+      echo 1
+    fi
+  fi
+}
+
+do_flash() {
+ 
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the flasher to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#flash_firmware=enable/flash_firmware=enable/"
+   	STATUS=enabled
+	ASK_TO_REBOOT=1
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^flash_firmware=enable/#flash_firmware=enable/"
+	STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The flasher is $STATUS" 20 60 1
+  fi
+}
+
+if [ $(id -u) -ne 0 ]; then
+  printf "Script must be run as root. Try 'sudo fire-config'\n"
+  exit 1
+fi
+
+
+get_camera() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_camera() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_camera) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the camera interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-cam-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The camera interface is $STATUS" 20 60 1
+  fi
+}
+
+
+get_camera() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_camera() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_camera) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the iic_2 interface isn't enable" 20 60
+    return 1
+  fi
+    
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the 74hc595 driver isn't enable" 20 60
+    return 1
+  fi
+  
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the camera interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-cam-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-cam-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The camera interface is $STATUS" 20 60 1
+  fi
+}
+
+get_18b20() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_18b20() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_18b20) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the 18b20 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-18b20-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-18b20-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The sound 18b20 is $STATUS" 20 60 1
+  fi
+}
+
+get_485r1() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_485r1() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_485r1) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the 485r1 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-485r1-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-485r1-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The 485r1 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_485r2() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_485r2() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_485r2) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the 485r2 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-485r2-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-485r2-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The 485r2 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_adc1() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_adc1() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_adc1) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the adc1 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-adc1-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-adc1-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The adc1 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_can1() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_can1() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_can1) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the can1 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-can1-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-can1-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The can1 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_can2() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_can2() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_can2) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the can2 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-can2-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-can2-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The can2 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_dht11() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_dht11() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_dht11) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the dht11 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-dht11-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-dht11-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The dht11 interface is $STATUS" 20 60 1
+  fi
+}
+
+get_ecspi3() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_ecspi3() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_dht11) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the ecspi3 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-ecspi3-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-ecspi3-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The ecspi3 interface is $STATUS" 20 60 1
+  fi
+}
+
+check_hdmi() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+get_hdmi() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_hdmi() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_hdmi) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-i2c2-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the iic_2 interface isn't enable" 20 60
+    return 1
+  fi
+    
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the 74hc595 driver isn't enable" 20 60
+    return 1
+  fi
+    
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the hdmi interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-hdmi-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-hdmi-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The hdmi interface is $STATUS" 20 60 1
+  fi
+}
+
+get_lcd43() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_lcd43() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_lcd43) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-i2c1-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the iic_1 interface isn't enable" 20 60
+    return 1
+  fi
+
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the lcd4.3 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-lcd43-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-lcd43-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The lcd4.3 interface is $STATUS" 20 60 1
+  fi
+}
+
+
+get_uart3() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_uart3() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_uart3) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the uart3 interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+    sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo/"
+    if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo" $CONFIG; then
+	  sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo\n&/" $CONFIG
+    fi
+    STATUS=enabled
+	dtoverlay /lib/firmware/imx-fire-uart3-overlay.dtbo
+  elif [ $RET -eq 1 ]; then
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-uart3-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The uart3 interface is $STATUS" 20 60 1
+  fi
+}	
+
+
+get_wifi() {
+  if grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo" $CONFIG; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+do_wifi() {
+  DEFAULT=--defaultno
+  CURRENT=0
+  if [ $(get_wifi) -eq 0 ]; then
+    DEFAULT=
+    CURRENT=1
+  fi
+    
+  if grep -q -E "^#dtoverlay=\/lib\/firmware\/imx-fire-74hc595-overlay.dtbo" $CONFIG; then
+    whiptail --msgbox "the 74hc595 driver isn't enable" 20 60
+    return 1
+  fi
+  
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the wifi interface to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq $CURRENT ]; then
+    ASK_TO_REBOOT=1
+  fi
+  if [ $RET -eq 0 ]; then
+     systemctl enable autowifi
+       sed $CONFIG -i -e "s/^#dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo/dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo/"
+       if ! grep -q -E "^dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo" $CONFIG; then
+	      sed -i "${line}s/.*/dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo\n&/" $CONFIG
+       fi
+       STATUS=enabled
+  elif [ $RET -eq 1 ]; then
+    systemctl disable autowifi
+    sed $CONFIG -i -e "s/^dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo/#dtoverlay=\/lib\/firmware\/imx-fire-btwifi-overlay.dtbo/"
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The wifi interface is $STATUS" 20 60 1
+  fi
+}
+
+do_wifi_scan()  {
+
+  RET=0
+  IFACE_LIST="$(list_wlan_interfaces)"
+  IFACE="$(echo "$IFACE_LIST" | head -n 1)"
+
+  if [ -z "$IFACE" ]; then
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "No wireless interface found" 20 60
+    fi
+    return 1
+  fi
+  
+  wpa_cli -i "$IFACE_LIST" scan
+  
+  #WIFI_LIST="$(wpa_cli -i "$IFACE_LIST" scan_result|tail -n +2|cut -f 3,5)"
+  echo "signal        wifi-name  
+  
+  ">/etc/wpa_supplicant/wifi.txt
+  wpa_cli -i "$IFACE_LIST" scan_result|tail -n +2|cut -f 3,5 >> /etc/wpa_supplicant/wifi.txt
+  whiptail --textbox --scrolltext "/etc/wpa_supplicant/wifi.txt" 20 60 
+  
+  return $RET 
+}
+
+
+
+
+
+
+    
+list_wlan_interfaces() {
+  for dir in /sys/class/net/*/wireless; do
+    if [ -d "$dir" ]; then
+      basename "$(dirname "$dir")"
+    fi
+  done
+}
+
+do_wifi_ssid_passphrase() {
+  RET=0
+  IFACE_LIST="$(list_wlan_interfaces)"
+  IFACE="$(echo "$IFACE_LIST" | head -n 1)"
+
+  if [ -z "$IFACE" ]; then
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "No wireless interface found" 20 60
+    fi
+    return 1
+  fi
+
+  if ! wpa_cli -i "$IFACE" status > /dev/null 2>&1; then
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Could not communicate with wpa_supplicant" 20 60
+    fi
+    return 1
+  fi
+
+  if [ "$INTERACTIVE" = True ] && [ -z "$(get_wifi_country)" ]; then
+    do_wifi_country
+  fi
+
+  SSID="$1"
+  while [ -z "$SSID" ] && [ "$INTERACTIVE" = True ]; do
+    SSID=$(whiptail --inputbox "Please enter SSID" 20 60 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ]; then
+      return 0
+    elif [ -z "$SSID" ]; then
+      whiptail --msgbox "SSID cannot be empty. Please try again." 20 60
+    fi
+  done
+
+  PASSPHRASE="$2"
+  while [ "$INTERACTIVE" = True ]; do
+    PASSPHRASE=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 20 60 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ]; then
+      return 0
+    else
+      break
+    fi
+  done
+
+  local ssid="$(echo "$SSID" \
+   | sed 's;\\;\\\\;g' \
+   | sed -e 's;\.;\\\.;g' \
+         -e 's;\*;\\\*;g' \
+         -e 's;\+;\\\+;g' \
+         -e 's;\?;\\\?;g' \
+         -e 's;\^;\\\^;g' \
+         -e 's;\$;\\\$;g' \
+         -e 's;\/;\\\/;g' \
+         -e 's;\[;\\\[;g' \
+         -e 's;\];\\\];g' \
+         -e 's;{;\\{;g'   \
+         -e 's;};\\};g'   \
+         -e 's;(;\\(;g'   \
+         -e 's;);\\);g'   \
+         -e 's;";\\\\\";g')"
+
+  wpa_cli -i "$IFACE" list_networks \
+   | tail -n +2 | cut -f -2 | grep -P "\t$ssid$" | cut -f1 \
+   | while read ID; do
+    wpa_cli -i "$IFACE" remove_network "$ID" > /dev/null 2>&1
+  done
+
+  ID="$(wpa_cli -i "$IFACE" add_network)"
+  wpa_cli -i "$IFACE" set_network "$ID" ssid "\"$SSID\"" 2>&1 | grep -q "OK"
+  RET=$((RET + $?))
+
+  if [ -z "$PASSPHRASE" ]; then
+    wpa_cli -i "$IFACE" set_network "$ID" key_mgmt NONE 2>&1 | grep -q "OK"
+    RET=$((RET + $?))
+  else
+    wpa_cli -i "$IFACE" set_network "$ID" psk "\"$PASSPHRASE\"" 2>&1 | grep -q "OK"
+    RET=$((RET + $?))
+  fi
+
+  if [ $RET -eq 0 ]; then
+    wpa_cli -i "$IFACE" enable_network "$ID" > /dev/null 2>&1
+  else
+    wpa_cli -i "$IFACE" remove_network "$ID" > /dev/null 2>&1
+    if [ "$INTERACTIVE" = True ]; then
+      whiptail --msgbox "Failed to set SSID or passphrase" 20 60
+    fi
+  fi
+
+  wpa_cli -i "$IFACE" save_config > /dev/null 2>&1
+
+  echo "$IFACE_LIST" | while read IFACE; do
+    wpa_cli -i "$IFACE" reconfigure > /dev/null 2>&1
+  done
+
+  return $RET
+}
+
+
+get_ssh() {
+  if service ssh status | grep -q inactive; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
+do_ssh() {
+  if [ -e /var/log/regen_ssh_keys.log ] && ! grep -q "^finished" /var/log/regen_ssh_keys.log; then
+    whiptail --msgbox "Initial ssh key generation still running. Please wait and try again." 20 60 2
+    return 1
+  fi
+  DEFAULT=--defaultno
+  if [ $(get_ssh) -eq 0 ]; then
+    DEFAULT=
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --yesno "Would you like the SSH server to be enabled?" $DEFAULT 20 60 2
+    RET=$?
+  else
+    RET=$1
+  fi
+  if [ $RET -eq 0 ]; then
+    ssh-keygen -A &&
+    update-rc.d ssh enable &&
+    invoke-rc.d ssh start &&
+    STATUS=enabled
+  elif [ $RET -eq 1 ]; then
+    update-rc.d ssh disable &&
+    invoke-rc.d ssh stop &&
+    STATUS=disabled
+  else
+    return $RET
+  fi
+  if [ "$INTERACTIVE" = True ]; then
+    whiptail --msgbox "The SSH server is $STATUS" 20 60 1
+  fi
+}
+
+do_modify_config()
+{
+  # judge whether $1 is defined in the uEnv.txt
+  grep $1 $CONFIG
+  # if defined, modify value directly
+  if [ $? == 0 ]; then
+    sed -i "s/$1_0=[0-9]*/$1_0=$2/" $CONFIG
+  # append the val at the end of the line
+  else
+    sed -i "/imx-fire-lcd5-overlay.dtbo/ s/$/,$1_0=$2/" $CONFIG
+  fi
+  ASK_TO_REBOOT=1
+}
+
+
+
+lcd_timing_array1="clock-frequency"
+lcd_timing_array2="hactive"
+lcd_timing_array3="vactive"
+lcd_timing_array4="hfront-porch"
+lcd_timing_array5="hback-porch"
+lcd_timing_array6="hsync-len"
+lcd_timing_array7="vback-porch"
+lcd_timing_array8="vfront-porch"
+lcd_timing_array9="vsync-len"
+lcd_timing_array10="bits-per-pixel"
+
+
+do_modify_lcd_timing()
+{
+  val=$(whiptail --inputbox "Please enter lcd_timing_array$1 value" 20 60 3>&1 1>&2 2>&3)
+  # Judge whether is number
+  if [ "$val" -gt 0 ] 2>/dev/null;then
+    case $1 in
+      1) do_modify_config clock-frequency $val;;
+      2) do_modify_config hactive $val;;
+      3) do_modify_config vactive $val;;
+      4) do_modify_config hfront-porch $val;;
+      5) do_modify_config hback-porch $val;;
+      6) do_modify_config hsync-len $val;;
+      7) do_modify_config vback-porch $val;;
+      8) do_modify_config vfront-porch $val;;
+      9) do_modify_config vsync-len $val;;
+      10) do_modify_config bits-per-pixel $val;;
+    esac
+  else
+    whiptail --msgbox "The value is incorrect, must be number" 20 60 1
+  fi
+}
+
+do_lcd_timing() 
+{
+  while true; do
+    OPTION=$(whiptail --title "LCD Timing Config" --menu "Choose your option" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+    "1" "clock-frequency" \
+    "2" "Horizontal display area" \
+    "3" "Vertical display area" \
+    "4" "HSD front porch" \
+    "5" "HSD back porch" \
+    "6" "HSD pulse width" \
+    "7" "VSD back porch" \
+    "8" "VSD front porch"  \
+    "9" "VSD pulse width" \
+    "10" "Display Format" \
+    3>&1 1>&2 2>&3)
+
+    exitstatus=$?
+    if [ $exitstatus = 0 ]; then
+      case "$OPTION" in 
+        *) do_modify_lcd_timing $OPTION;;
+      esac
+      
+    else
+      return 0
+    fi 
+  done
+  
+}
+
+
+if [ "$INTERACTIVE" = True ]; then
+  [ -e $CONFIG ] || touch $CONFIG
+  calc_wt_size
+  while true; do
+      FUN=$(whiptail --title "Embedfire imx6ull Software Configuration Tool (fire-config)" --backtitle "Embedfire i.MX6 ULL NPi Board" --menu "Setup Options" $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT --cancel-button Finish --ok-button Select \
+    "P1 IIC_1" "Enable/Disable the IIC_1 INTERFACE on the imx6ull-fire board" \
+    "P2 IIC_2" "Enable/Disable the IIC_2 INTERFACE on the imx6ull-fire board" \
+    "P3 74HC595" "Enable/Disable the 74HC595 driver on the imx6ull-fire board" \
+		"P4 LED" "Enable/Disable the led driver on the imx6ull-fire board" \
+		"P5 KEY" "Enable/Disable the key driver on the imx6ull-fire board" \
+		"P6 18B20" "Enable/Disable the 18b20 driver on the imx6ull-fire board" \
+		"P7 HDMI" "Enable/Disable the hdmi driver on the imx6ull-fire board" \
+		"P8 CAMERA" "Enable/Disable the camera driver on the imx6ull-fire board" \
+		"P9 SOUND" "Enable/Disable providing a massive, full-bodied sound like movie sound effects" \
+		"P10 LCD5" "Enable/Disable the 5 inch touch screen" \
+		"P11 LCD4.3" "Enable/Disable the 4.3 inch touch screen" \
+		"P12 485r1" "Enable/Disable the 485r1 driver on the imx6ull-fire board" \
+		"P13 485r2" "Enable/Disable the 485r2 driver on the imx6ull-fire board" \
+		"P14 ADC1" "Enable/Disable the adc1 driver on the imx6ull-fire board" \
+		"P15 CAN1" "Enable/Disable the can1 driver on the imx6ull-fire board" \
+		"P16 CAN2" "Enable/Disable the can2 driver on the imx6ull-fire board" \
+		"P17 dht11" "Enable/Disable the dht11 driver on the imx6ull-fire board" \
+		"P18 ecspi3" "Enable/Disable the ecspi3 driver on the imx6ull-fire board" \
+		"P19 uart3" "Enable/Disable the uart3 driver on the imx6ull-fire board" \
+    "P20 wifi" "Enable/Disable the wifi driver on the imx6ull-fire board" \
+    "P21 wifi_scan" "Search for available wifi(ssid)" \
+    "P22 wifi_setting" "Enter SSID and passphrase" \
+    "P23 SSH_connet" "Enable/Disable remote command line (SSH)" \
+    "P24 flasher" "Enable/Disable to download firmware to flash from microSD media" \
+    "P25 Expand Filesystem" "Ensures that all of the SD card storage is available to the OS" \
+    "P26 LCD Config" "LCD Timing Config" \
+        3>&1 1>&2 2>&3)
+    RET=$?
+    if [ $RET -eq 1 ]; then
+      do_finish
+    elif [ $RET -eq 0 ]; then
+	
+        case "$FUN" in
+      P1\ *) do_iic1 ;;
+		  P2\ *) do_iic2 ;;
+		  P3\ *) do_74hc595 ;;
+		  P4\ *) do_led ;;
+		  P5\ *) do_key ;;
+		  P6\ *) do_18b20 ;;
+		  P7\ *) do_hdmi ;;
+		  P8\ *) do_camera ;;
+		  P9\ *) do_sound ;;
+		  P10\ *) do_lcd5 ;;
+		  P11\ *) do_lcd43 ;;
+		  P12\ *) do_485r1 ;;
+		  P13\ *) do_485r2 ;;
+		  P14\ *) do_adc1 ;;
+		  P15\ *) do_can1 ;;
+		  P16\ *) do_can2 ;;
+		  P17\ *) do_dht11 ;;
+		  P18\ *) do_ecspi3 ;;
+		  P19\ *) do_uart3 ;;
+      P20\ *) do_wifi ;;
+      P21\ *) do_wifi_scan ;;
+      P22\ *) do_wifi_ssid_passphrase ;;
+      P23\ *) do_ssh ;;
+      P24\ *) do_flash ;;  
+      P25\ *) do_expand_rootfs ;;
+      P26\ *) do_lcd_timing ;;
+          *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
+        esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
+    else
+      exit 1
+    fi
+  done
+fi
+
+
+
+
+
+
+
